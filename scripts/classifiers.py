@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 plt.style.use("ggplot")
 from itertools import chain
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn import metrics
@@ -16,26 +15,45 @@ from keras.layers import Dense
 from keras.layers import LSTM,Dense, Dropout, Masking, Embedding
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import cross_val_score,KFold, StratifiedKFold,train_test_split
 
-def mnb_classify(sets):   
+def mnb_classify(sets,datanv): 
+    X=np.concatenate((sets[0],sets[1]))
+    y=np.concatenate((sets[2],sets[3]))    
     mnb = MultinomialNB()
+    scores = cross_val_score(mnb, X, y, scoring='accuracy', cv=StratifiedKFold(n_splits=10), n_jobs=-1)
+    print('Accuracy with cross validation: %.3f (%.3f)' % (np.mean(scores), np.std(scores)))
     mnb.fit(sets[0],sets[2])
-    MultinomialNB()
     y_pred = mnb.predict(sets[1])
+    y_list=y_pred.tolist()
+    with open("pred_mnb.csv", "w") as file_csv:
+        file_csv.write("predicted,label,value"+"\n")
+        for i in range (0,len(y_list)):
+            file_csv.write(str(y_list[i])+","+str(sets[3][i])+","+str(datanv[i])+"\n")
     print("MNB Accuracy:",metrics.accuracy_score(sets[3], y_pred))
     print(metrics.classification_report(sets[3], y_pred))
     matBinary = metrics.confusion_matrix(sets[3], y_pred)
     print(confusion_matrix(sets[3], y_pred))
-    plot(matBinary)
 
-def svm_classify(sets):
+def svm_classify(sets,datanv):
+    X=np.concatenate((sets[0],sets[1]))
+    y=np.concatenate((sets[2],sets[3]))  
     model = SVC(kernel='linear')
-    model.fit(sets[0], sets[2])
-    print(model)
+    scores = cross_val_score(model, X, y, scoring='accuracy', cv=StratifiedKFold(n_splits=5), n_jobs=-1)
+    print('Accuracy with cross validation: %.3f (%.3f)' % (np.mean(scores), np.std(scores)))
     expected = sets[2]
+    model.fit(sets[0], sets[2])
     predicted = model.predict(sets[0])
+    y_list=predicted.tolist()
+    with open("pred_svm.csv", "w") as file_csv:
+        file_csv.write("predicted,label,value"+"\n")
+        for i in range (0,len(y_list)):
+            file_csv.write(str(y_list[i])+","+str(sets[3][i])+","+str(datanv[i])+"\n")
+    print("SVM Accuracy:",metrics.accuracy_score(sets[2], predicted))
     print(metrics.classification_report(expected, predicted))
     print(metrics.confusion_matrix(expected, predicted))
+    
 
 def LSTM_classify(sets):
     """
@@ -87,11 +105,18 @@ def LSTM_classify(sets):
                     validation_data=(X_valid, y_valid))
     model.evaluate(X_valid, y_valid)"""
 
-def divide_dataset(data,labels):
+def divide_dataset_random(data,labels):
     X_train, X_test, y_train, y_test = train_test_split(
            data,labels,
-           test_size = 0.25, random_state = 0)
-    return[X_train,X_test,y_train,y_test]
+           test_size = 0.25, random_state = 42)
+    return[X_train,X_test,y_train,y_test,data]
+
+def divide_dataset(data,labels,data_t,labels_t):
+    X_train=data
+    X_test=data_t
+    y_train=labels
+    y_test=labels_t
+    return[X_train,X_test,y_train,y_test,data]
 
 def vectorize(column):
     vectorizer = CountVectorizer()
@@ -99,17 +124,22 @@ def vectorize(column):
     vector = vectorizer.transform(column)
     return vector.toarray()
 
-def transform(filenamem,filenamenm):
-    filem=r'{0}.csv'.format(filenamem)
-    filenm=r'{0}.csv'.format(filenamenm)
-    data_framem=pd.read_csv(filem,encoding='latin-1')
-    data_framenm=pd.read_csv(filenm,encoding='latin-1')
-    misogino = data_framem["misogino"]
-    no_misogino = data_framenm["no_misogino"]
-    data = list(chain(misogino, no_misogino))
-    labels = np.concatenate((np.ones(len(misogino)),np.zeros(len(no_misogino))))
+def transform(filename):
+    filem=r'{0}.csv'.format(filename)
+    data_frame=pd.read_csv(filem,encoding='latin-1')
+    misogino = data_frame["misogino"]
+    no_misogino = data_frame["no_misogino"]
+    misogino_t = data_frame["mis_train"].dropna()
+    no_misogino_t = data_frame["nomis_train"].dropna()
+    maxwords(misogino)
+    maxwords(no_misogino)
+    data = list(chain(misogino, misogino_t,no_misogino,no_misogino_t))
+    data_t = list(chain(misogino_t, no_misogino_t))
+    labels = np.concatenate((np.ones(len(misogino)+(len(misogino_t))),np.zeros(len(no_misogino)+len(no_misogino_t))))
+    labels_t = np.concatenate((np.ones(len(misogino_t)),np.zeros(len(no_misogino_t))))
     data_vect=vectorize(data)
-    return divide_dataset(data_vect,labels)
+    data_vect_t=np.concatenate((data_vect[850:1100],data_vect[-250:]))
+    return divide_dataset(data_vect,labels,data_vect_t,labels_t),data_t
 
 def plot(matBinary):
     labels = ['negative', 'NOT negative']
@@ -144,8 +174,10 @@ def maxwords(column):
     return  max_phrase_len
 
 if __name__ == "__main__":
-    files=["m_stopwords","m_nostopwords","m_NLTKstopwords","nm_stopwords","nm_nostopwords","nm_NLTKstopwords"]
-    sets=transform("m_NLTKstopwords","nm_NLTKstopwords")
-    mnb_classify(sets)
-    svm_classify(sets)
+    #print(metrics.SCORERS.keys())
+    files=["nm_nostopwords","m_nostopwords","m_stopwords","nm_stopwords","m_NLTKstopwords","nm_NLTKstopwords"]
+    sets,datanv_t=transform("preprocessed")
+    
+    mnb_classify(sets,datanv_t)
+    #svm_classify(sets,datanv_t)
     #LSTM_classify(sets)
