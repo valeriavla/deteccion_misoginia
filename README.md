@@ -1,7 +1,7 @@
 # Detección de misoginia en textos cortos mediante clasificadores supervisados 
 ## Misogyny detection in short texts
 
-Thesis to obtain the Bachelor of Engineering in Information Technology degree. Full thesis work at [BUAP University repository]([https://www.codecademy.com/pages/contribute-docs](https://repositorioinstitucional.buap.mx/server/api/core/bitstreams/4a16ed9e-5072-4984-8913-2a127f61da8e/content))!
+Thesis to obtain the Bachelor of Engineering in Information Technology degree. Full thesis work at [BUAP University repository](https://repositorioinstitucional.buap.mx/server/api/core/bitstreams/4a16ed9e-5072-4984-8913-2a127f61da8e/content)
 
 ## Summary:
 Sentiment analysis is an area of ​​study that involves the use and management of information for the detection of moods, emotions and attitudes, expressed in text and search determine a person's attitude related to objects, services, places, events or topics specific.
